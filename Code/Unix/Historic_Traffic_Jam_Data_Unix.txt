@@ -1,0 +1,17 @@
+The following code was written to extract the necessary data from the file containing history traffic jam data:
+___________________________________________________________________________________________________________________________________________________________________________
+
+The code is built up as follows:
+ 
+#Take the file traffic_jams.csv, which is obtained from rijkswaterstaat
+#Select the columns we are interested in
+#Filter only the days we are interested in
+#Filter all traffic jams that happened on the A4
+#Filter traffic jams based on the direction: Amsterdam --> The Hague (oplopend)
+#Filter only traffic jams that were caused by the sheer weigth of traffic (Spitsfile)
+#Switch columns around such that the column containing the start and end position of the traffic jam is column #1
+#Filter only traffic jams that occured between our specified hectometre posts: 23.0 and 38.0
+#Write the result to a seperate text file
+
+cat traffic_jams.csv | cut -d ',' -f2,5-6,8,16-18,25,34 | grep -e ^<month>/<days>/<year> | grep -w "A4" | grep oplopend | grep Spitsfile | awk 'BEGIN{FS=OFS=","}{$0=$5 FS$6 FS $2 FS $3 FS $1}1' | sort -nr | grep -e ^2[3-9] -e ^3[0-7] -e ^38.0 | grep -e ^[0-9\.]*,2[3-9] -e ^[0-9\.]*,3[0-7] > Traffic_Jams_A4.txt
+ 

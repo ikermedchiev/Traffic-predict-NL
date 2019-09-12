@@ -1,0 +1,12 @@
+#!/bin/bash
+
+process(){
+	gunzip $1
+        file=$(echo "$1" | sed -e 's/\.gz$//g')
+        echo "$file"
+        selectAndReduce $file $2
+        rm $file	
+}
+
+export -f process
+find $1 | grep ".gz$" | sort | xargs -P2 -I % bash -c "process % $2" 

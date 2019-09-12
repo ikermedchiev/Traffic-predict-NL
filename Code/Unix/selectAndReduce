@@ -1,0 +1,85 @@
+#!/bin/bash
+
+IFS=$'\n'
+
+collapsedData=$(cat $1 | xmllint --format - | grep "measurementSiteReference\|vehicleFlowRate\|speed")
+
+#------------------------- Filter only the relevant measurement sites ------------------------------
+
+locations=$(cat $2 | paste -s -d '|' | sed -e 's_|_\\|_g')
+locationRows=$(echo "$collapsedData" | grep -n "$locations" | cut -f 1 -d ":")
+# echo "$locationRows"
+
+allLocations=$(echo "$collapsedData" | grep -n "measurementSiteReference" | cut -f 1 -d ":")
+# echo "$allLocations"
+
+measurementData=""
+
+printf 'Building reduced dataset' 
+
+for start in $locationRows; do
+
+        lineNumber=$(echo "$allLocations" | grep -nx "$start" | cut -f 1 -d ":")
+        (( lineNumber++ ))
+
+        end=$(echo "$allLocations" | head -n "$lineNumber" | tail -n 1)
+        (( end-- ))    
+
+        #echo "$start to $end"
+	printf '.' 
+        measurementData="$measurementData
+$(echo "$collapsedData" | range $start $end)"
+done
+
+#-------------------------- Reduce the data to a single value per measurement site -----------------
+
+vehicleFlowRate=0
+vehicleFlowRateCount=0
+speed=-1
+speedCount=0
+station=""
+
+lineNumber=1
+totalLines=$(echo "$measurementData" | wc -l)
+
+printf '\nCalculating averages:\n'
+
+for line in $measurementData; do
+        printf '\rLine %d of %d' "$lineNumber" "$totalLines"
+        (( lineNumber++ ))
+
+        measurement=$(echo $line | grep -o -E [\.0-9-]+ | cut -f 1 -d '.')
+        if echo "$line" | grep -q "speed" ; then
+                if [[ ("$measurement" != "-1") && ("$measurement" != "0") ]] ; then
+                        speed=$(( speed+measurement ))
+                        (( speedCount++ ))
+                fi
+        elif echo "$line" | grep -q "vehicleFlowRate" ; then
+                if [ "$measurement" != "0" ] ; then
+                        vehicleFlowRate=$(( vehicleFlowRate+measurement ))
+                        (( vehicleFlowRateCount++ ))
+                fi
+        else
+                if [ ! -z "$station" ] ; then
+                        if [ "$speedCount" != "0" ] ; then
+                                speed=$(( speed/speedCount ))
+                        fi
+                        if [ "$vehicleFlowRateCount" != "0" ] ; then
+                                vehicleFlowRate=$(( vehicleFlowRate/vehicleFlowRateCount ))
+                        fi
+                        echo "$station,$speed,$vehicleFlowRate" >> "$1_Reduced"
+                fi
+                vehicleFlowRate=0
+                vehicleFlowRateCount=0
+                speed=-1
+                speedCount=0
+                station=$(echo $line |  grep -o -E 'id=".+?" ')
+        fi
+done
+
+# Last will otherwise never get printed
+if [ ! -z "$station" ] ; then
+        echo "$station,$speed,$vehicleFlowRate" >> "$1_Reduced"
+fi
+
+printf "\nDone! The resulting file: %s\n" "$1_Reduced"

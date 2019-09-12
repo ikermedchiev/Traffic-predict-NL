@@ -1,0 +1,13 @@
+#!/bin/bash
+
+files=$(find $1 -type f | grep -v "_Reduced$" | sort)
+
+for file in $files; do
+	if echo "$file" | grep -q "gz$" ; then 
+		gunzip $file
+		file=$(echo "$file" | sed -e 's/\.gz$//g') 
+	fi
+	echo "$file"
+	selectAndReduce $file $2
+	rm $file
+done
